@@ -5,25 +5,34 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-
-	log "github.com/sirupsen/logrus"
+	"time"
 )
+
+type LogEntry struct {
+	ip       string
+	respCode string
+}
 
 var logPattern = regexp.MustCompile(`^(\S+) (\S+) (\S+) \[([^\]]+)\] "(\S+) ([^"]*) (\S+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)" "([^"]*)"$`)
 
-func parseLine(line string) (string, error) {
+func parseLine(line string) (LogEntry, error) {
 	m := logPattern.FindStringSubmatch(line)
 
 	if m == nil {
-		return "", fmt.Errorf("line does not match log pattern: %q\n", string(line))
+		return LogEntry{}, fmt.Errorf("line does not match log pattern: %q\n", string(line))
 	}
+
+	// index 1 is ipv4 address
+	ipAddr := m[1]
 
 	// index 8 is HTTP status code in regex
 	respCode := m[8]
-	return respCode, nil
+
+	logEntry := LogEntry{ipAddr, respCode}
+	return logEntry, nil
 }
 
-func printReport(data map[string]int) {
+func printRequestReport(data map[string]int) {
 	if len(data) == 0 {
 		fmt.Println("the length of data is 0")
 		return
@@ -42,28 +51,45 @@ func printReport(data map[string]int) {
 	}
 }
 
-func GenerateReport(filepath string) error {
-	respCodeMap := make(map[string]int)
+func printIpReport(data map[string]int) {
+	if len(data) == 0 {
+		fmt.Println("the length of data is 0")
+		return
+	}
 
+	fmt.Println("Unique addresses:", len(data))
+}
+
+func GenerateReport(filepath string) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("\"%s\" no such file or directory", filepath)
 	}
-
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+
+	respCodeMap := make(map[string]int)
+	ipAddrMap := make(map[string]int)
+
+	startTime := time.Now()
 	for scanner.Scan() {
-		respCode, err := parseLine(scanner.Text())
+		logEntry, err := parseLine(scanner.Text())
 
 		if err != nil {
-			log.Info(err)
+			fmt.Print(err)
 			continue
 		}
 
-		respCodeMap[respCode]++
+		ipAddrMap[logEntry.ip]++
+		respCodeMap[logEntry.respCode]++
 	}
+	elapsed := time.Since(startTime)
 
-	printReport(respCodeMap)
+	fmt.Println("Log parsing time:", elapsed)
+
+	printRequestReport(respCodeMap)
+	printIpReport(ipAddrMap)
+
 	return nil
 }
