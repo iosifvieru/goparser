@@ -58,6 +58,10 @@ func printIpReport(data map[string]int) {
 	}
 
 	fmt.Println("Unique addresses:", len(data))
+
+	for k, v := range data {
+		fmt.Printf("IP %s got %d hits.\n", k, v)
+	}
 }
 
 func GenerateReport(filepath string) error {
@@ -86,6 +90,7 @@ func GenerateReport(filepath string) error {
 	}
 	elapsed := time.Since(startTime)
 
+	fmt.Println("Log source:", filepath)
 	fmt.Println("Log parsing time:", elapsed)
 
 	printRequestReport(respCodeMap)
